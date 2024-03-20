@@ -127,6 +127,13 @@ int main(int argc, char** argv)
   contextInfo.addInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, true);  // Allow debug names
   contextInfo.addDeviceExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);            // Enabling ability to present rendering
 
+  // #VKRay: Activate the ray tracing extension
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeature{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+  contextInfo.addDeviceExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, false, &accelFeature);  // To build acceleration structures
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR};
+  contextInfo.addDeviceExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, false, &rtPipelineFeature);  // To use vkCmdTraceRaysKHR
+  contextInfo.addDeviceExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);  // Required by ray tracing pipeline
+
   // Creating Vulkan base application
   nvvk::Context vkctx{};
   vkctx.initInstance(contextInfo);
@@ -161,6 +168,14 @@ int main(int argc, char** argv)
   helloVk.createUniformBuffer();
   helloVk.createObjDescriptionBuffer();
   helloVk.updateDescriptorSet();
+  // #VKRay
+  helloVk.initRayTracing();
+  helloVk.createBottomLevelAS();
+  helloVk.createTopLevelAS();
+  helloVk.createRtDescriptorSet();
+  helloVk.createRtPipeline();
+  helloVk.createRtShaderBindingTable();
+  bool useRaytracer = true;
 
   helloVk.createPostDescriptor();
   helloVk.createPostPipeline();
@@ -187,6 +202,7 @@ int main(int argc, char** argv)
     {
       ImGuiH::Panel::Begin();
       ImGui::ColorEdit3("Clear color", reinterpret_cast<float*>(&clearColor));
+      ImGui::Checkbox("Ray Tracer mode", &useRaytracer);  // Switch between raster and ray tracing
       renderUI(helloVk);
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGuiH::Control::Info("", "", "(F10) Toggle Pane", ImGuiH::Control::Flags::Disabled);
@@ -223,7 +239,17 @@ int main(int argc, char** argv)
 
       // Rendering Scene
       vkCmdBeginRenderPass(cmdBuf, &offscreenRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-      helloVk.rasterize(cmdBuf);
+      // Rendering Scene
+      if(useRaytracer)
+      {
+        helloVk.raytrace(cmdBuf, clearColor);
+      }
+      else
+      {
+        vkCmdBeginRenderPass(cmdBuf, &offscreenRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        helloVk.rasterize(cmdBuf);
+        vkCmdEndRenderPass(cmdBuf);
+      }
       vkCmdEndRenderPass(cmdBuf);
     }
 

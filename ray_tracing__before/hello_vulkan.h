@@ -26,6 +26,9 @@
 #include "nvvk/resourceallocator_vk.hpp"
 #include "shaders/host_device.h"
 
+// #VKRay
+#include "nvvk/raytraceKHR_vk.hpp"
+
 //--------------------------------------------------------------------------------------------------
 // Simple rasterizer of OBJ objects
 // - Each OBJ loaded are stored in an `ObjModel` and referenced by a `ObjInstance`
@@ -119,4 +122,40 @@ public:
   nvvk::Texture               m_offscreenDepth;
   VkFormat                    m_offscreenColorFormat{VK_FORMAT_R32G32B32A32_SFLOAT};
   VkFormat                    m_offscreenDepthFormat{VK_FORMAT_X8_D24_UNORM_PACK32};
+
+  // #VKRay
+  void initRayTracing();
+  VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
+  nvvk::RaytracingBuilderKHR m_rtBuilder;
+  nvvk::RaytracingBuilderKHR::BlasInput objectToVkGeometryKHR(const ObjModel& model);
+  void createBottomLevelAS();
+  void createTopLevelAS();
+
+  void createRtDescriptorSet();
+
+  nvvk::DescriptorSetBindings m_rtDescSetLayoutBind;
+  VkDescriptorPool            m_rtDescPool;
+  VkDescriptorSetLayout       m_rtDescSetLayout;
+  VkDescriptorSet             m_rtDescSet;
+
+  void updateRtDescriptorSet();
+
+  void createRtPipeline();
+
+  std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_rtShaderGroups;
+  VkPipelineLayout                                  m_rtPipelineLayout;
+  VkPipeline                                        m_rtPipeline;
+
+  // Push constant for ray tracer
+  PushConstantRay m_pcRay{};
+
+  void createRtShaderBindingTable();
+
+  nvvk::Buffer                    m_rtSBTBuffer;
+  VkStridedDeviceAddressRegionKHR m_rgenRegion{};
+  VkStridedDeviceAddressRegionKHR m_missRegion{};
+  VkStridedDeviceAddressRegionKHR m_hitRegion{};
+  VkStridedDeviceAddressRegionKHR m_callRegion{};
+
+  void raytrace(const VkCommandBuffer& cmdBuf, const glm::vec4& clearColor);
 };
